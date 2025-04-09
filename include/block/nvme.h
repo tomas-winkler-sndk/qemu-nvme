@@ -1127,6 +1127,7 @@ enum NvmeIdCns {
     NVME_ID_CNS_CTRL_LIST             = 0x13,
     NVME_ID_CNS_PRIMARY_CTRL_CAP      = 0x14,
     NVME_ID_CNS_SECONDARY_CTRL_LIST   = 0x15,
+    NVME_ID_CNS_UUID_LIST             = 0x17,
     NVME_ID_CNS_ENDURANCE_GROUP_LIST  = 0x19,
     NVME_ID_CNS_CS_NS_PRESENT_LIST    = 0x1a,
     NVME_ID_CNS_CS_NS_PRESENT         = 0x1b,
@@ -1227,10 +1228,11 @@ enum NvmeIdCtrlOaes {
 };
 
 enum NvmeIdCtrlCtratt {
-    NVME_CTRATT_ENDGRPS = 1 <<  4,
-    NVME_CTRATT_ELBAS   = 1 << 15,
-    NVME_CTRATT_MEM     = 1 << 16,
-    NVME_CTRATT_FDPS    = 1 << 19,
+    NVME_CTRATT_ENDGRPS   = 1 << 4,
+    NVME_CTRATT_UUID_LIST = 1 << 9,
+    NVME_CTRATT_ELBAS     = 1 << 15,
+    NVME_CTRATT_MEM       = 1 << 16,
+    NVME_CTRATT_FDPS      = 1 << 19,
 };
 
 enum NvmeIdCtrlOacs {
@@ -1416,6 +1418,7 @@ typedef struct QEMU_PACKED NvmeLBAFE {
 
 #define NVME_NSID_BROADCAST 0xffffffff
 #define NVME_MAX_NLBAF 64
+#define NVME_ID_UUID_LIST_MAX 127
 
 typedef struct QEMU_PACKED NvmeIdNs {
     uint64_t    nsze;
@@ -1491,6 +1494,26 @@ typedef struct QEMU_PACKED NvmeIdNsDescr {
     uint8_t nidl;
     uint8_t rsvd2[2];
 } NvmeIdNsDescr;
+
+
+enum NvmeIdUuidAssociation {
+    NVME_ID_UUID_HDR_ASSOCIATION_MASK               = 0x3,
+    NVME_ID_UUID_ASSOCIATION_NONE                   = 0,
+    NVME_ID_UUID_ASSOCIATION_VENDOR                 = 1,
+    NVME_ID_UUID_ASSOCIATION_SUBSYSTEM_VENDOR       = 2,
+};
+
+
+typedef struct QEMU_PACKED NvmeIdUuidListEntry {
+    uint8_t header;
+    uint8_t rsvd1[15];
+    uint8_t uuid[16];
+} NvmeIdUuidListEntry;
+
+typedef struct QEMU_PACKED NvmeIdUuidList {
+    uint8_t rsvd0[32];
+    struct NvmeIdUuidListEntry entry[NVME_ID_UUID_LIST_MAX];
+} NvmeIdUuidList;
 
 enum NvmeNsIdentifierLength {
     NVME_NIDL_EUI64             = 8,

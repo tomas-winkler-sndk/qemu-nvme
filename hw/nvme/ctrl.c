@@ -5952,6 +5952,30 @@ static uint16_t nvme_identify_nslist_csi(NvmeCtrl *n, NvmeRequest *req,
     return nvme_c2h(n, list, data_len, req);
 }
 
+static uint16_t nvme_identify_uuid_list(NvmeCtrl *n, NvmeRequest *req)
+{
+    NvmeIdUuidList uuid_list;
+    NvmeUUIDListEntry *ent;
+
+    memset(&uuid_list, 0, sizeof(uuid_list));
+
+    uint32_t i = 0;
+    QLIST_FOREACH(ent, &n->params.uuid_list, next) {
+	/* the last entry must be set to zero */
+        if (i >= (NVME_ID_UUID_LIST_MAX - 1)) {
+            warn_report("UUID list truncated, too many entries (%u max)",
+                        NVME_ID_UUID_LIST_MAX);
+            break;
+        }
+        memcpy(uuid_list.entry[i].uuid, ent->uuid.data,
+               sizeof(uuid_list.entry[i].uuid));
+        uuid_list.entry[i].header = ent->idassoc & NVME_ID_UUID_HDR_ASSOCIATION_MASK;
+        i++;
+    }
+
+    return nvme_c2h(n, &uuid_list, sizeof(uuid_list), req);
+}
+
 static uint16_t nvme_endurance_group_list(NvmeCtrl *n, NvmeRequest *req)
 {
     uint16_t list[NVME_CONTROLLER_LIST_SIZE] = {};
@@ -6091,6 +6115,8 @@ static uint16_t nvme_identify(NvmeCtrl *n, NvmeRequest *req)
         return nvme_identify_nslist(n, req, false);
     case NVME_ID_CNS_CS_NS_ACTIVE_LIST:
         return nvme_identify_nslist_csi(n, req, true);
+    case NVME_ID_CNS_UUID_LIST:
+        return nvme_identify_uuid_list(n, req);
     case NVME_ID_CNS_ENDURANCE_GROUP_LIST:
         return nvme_endurance_group_list(n, req);
     case NVME_ID_CNS_CS_NS_PRESENT_LIST:
@@ -8883,6 +8909,12 @@ static void nvme_init_ctrl(NvmeCtrl *n, PCIDevice *pci_dev)
     id->cmic |= NVME_CMIC_MULTI_CTRL;
     ctratt |= NVME_CTRATT_ENDGRPS;
 
+    /* check if there is valid uuid */
+    NvmeUUIDListEntry *ent = QLIST_FIRST(&n->params.uuid_list);
+    if (ent && !qemu_uuid_is_null(&ent->uuid)) {
+        ctratt |= NVME_CTRATT_UUID_LIST;
+    }
+
     id->endgidmax = cpu_to_le16(0x1);
 
     if (n->subsys->endgrp.fdp.enabled) {
@@ -9089,6 +9121,7 @@ static const Property nvme_props[] = {
     DEFINE_PROP_UINT16("atomic.awun", NvmeCtrl, params.atomic_awun, 0),
     DEFINE_PROP_UINT16("atomic.awupf", NvmeCtrl, params.atomic_awupf, 0),
     DEFINE_PROP_BOOL("ocp", NvmeCtrl, params.ocp, false),
+    DEFINE_PROP_UUID_LIST("uuid_list", NvmeCtrl, params.uuid_list),
 };
 
 static void nvme_get_smart_warning(Object *obj, Visitor *v, const char *name,
