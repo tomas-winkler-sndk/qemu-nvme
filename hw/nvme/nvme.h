@@ -567,6 +567,8 @@ typedef struct NvmeParams {
     uint16_t msix_qsize;
     uint16_t mqes;
     uint32_t cmb_size_mb;
+    uint32_t hmpre; /* Host Memory Buffer prefered size */
+    uint32_t hmmin; /* Host Memory Buffer minimum size */
     uint8_t  aerl;
     uint32_t aer_max_queued;
     uint8_t  mdts;

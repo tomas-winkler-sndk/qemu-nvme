@@ -29,6 +29,8 @@
  *      -device nvme-subsys,id=<subsys_id>,nqn=<nqn_id>
  *      -device nvme,serial=<serial>,id=<bus_name>, \
  *              cmb_size_mb=<cmb_size_mb[optional]>, \
+ *              hmb_prefered_size=<hmb_prefered_size in 4K units[optional]>, \
+ *              hmb_minimum_size=<hmb_minimum_size in 4K units[optional]>, \
  *              [pmrdev=<mem_backend_file_id>,] \
  *              max_ioqpairs=<N[optional]>, \
  *              aerl=<N[optional]>,aer_max_queued=<N[optional]>, \
@@ -8346,6 +8348,11 @@ static bool nvme_check_params(NvmeCtrl *n, Error **errp)
         return false;
     }
 
+    if (params->hmmin > params->hmpre) {
+        error_setg(errp, "hmmin must be smaller than hmpre");
+        return false;
+    }
+
     if (params->sriov_max_vfs) {
         if (!n->subsys) {
             error_setg(errp, "subsystem is required for the use of SR-IOV");
@@ -8907,6 +8914,13 @@ static void nvme_init_ctrl(NvmeCtrl *n, PCIDevice *pci_dev)
     if (pci_is_vf(pci_dev) && !sctrl->scs) {
         stl_le_p(&n->bar.csts, NVME_CSTS_FAILED);
     }
+
+    /* Host memory buffer*/
+    id->hmpre = cpu_to_le16(n->params.hmpre);
+    id->hmmin = cpu_to_le16(n->params.hmmin);
+    id->hmminds = 4; /* 4 * 4K */
+    id->hmmaxd = 0;
+
 }
 
 static int nvme_init_subsys(NvmeCtrl *n, Error **errp)
@@ -9057,6 +9071,8 @@ static const Property nvme_props[] = {
                      NvmeSubsystem *),
     DEFINE_PROP_STRING("serial", NvmeCtrl, params.serial),
     DEFINE_PROP_UINT32("cmb_size_mb", NvmeCtrl, params.cmb_size_mb, 0),
+    DEFINE_PROP_UINT32("hmpre", NvmeCtrl, params.hmpre, 0),
+    DEFINE_PROP_UINT32("hmmin", NvmeCtrl, params.hmmin, 0),
     DEFINE_PROP_UINT32("num_queues", NvmeCtrl, params.num_queues, 0),
     DEFINE_PROP_UINT32("max_ioqpairs", NvmeCtrl, params.max_ioqpairs, 64),
     DEFINE_PROP_UINT16("msix_qsize", NvmeCtrl, params.msix_qsize, 65),
