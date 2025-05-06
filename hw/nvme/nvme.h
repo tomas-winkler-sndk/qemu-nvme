@@ -645,6 +645,13 @@ typedef struct NvmeCtrl {
         hwaddr            cba;
     } pmr;
 
+    struct {
+        uint32_t hmb_ctrl;
+        uint32_t hmb_size;
+        hwaddr   hmb_addr;
+        uint32_t hmb_count;
+    } hmb;
+
     uint8_t     aer_mask;
     NvmeRequest **aer_reqs;
     QTAILQ_HEAD(, NvmeAsyncEvent) aer_queue;

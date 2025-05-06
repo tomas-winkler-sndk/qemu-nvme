@@ -247,6 +247,7 @@ static const bool nvme_feature_support[NVME_FID_MAX] = {
     [NVME_INTERRUPT_VECTOR_CONF]    = true,
     [NVME_WRITE_ATOMICITY]          = true,
     [NVME_ASYNCHRONOUS_EVENT_CONF]  = true,
+    [NVME_HOST_MEMORY_BUFFER]       = true,
     [NVME_TIMESTAMP]                = true,
     [NVME_HOST_BEHAVIOR_SUPPORT]    = true,
     [NVME_COMMAND_SET_PROFILE]      = true,
@@ -261,6 +262,7 @@ static const uint32_t nvme_feature_cap[NVME_FID_MAX] = {
     [NVME_NUMBER_OF_QUEUES]         = NVME_FEAT_CAP_CHANGE,
     [NVME_WRITE_ATOMICITY]          = NVME_FEAT_CAP_CHANGE,
     [NVME_ASYNCHRONOUS_EVENT_CONF]  = NVME_FEAT_CAP_CHANGE,
+    [NVME_HOST_MEMORY_BUFFER]       = NVME_FEAT_CAP_CHANGE,
     [NVME_TIMESTAMP]                = NVME_FEAT_CAP_CHANGE,
     [NVME_HOST_BEHAVIOR_SUPPORT]    = NVME_FEAT_CAP_CHANGE,
     [NVME_COMMAND_SET_PROFILE]      = NVME_FEAT_CAP_CHANGE,
@@ -6267,6 +6269,12 @@ static uint16_t nvme_get_feature_fdp_events(NvmeCtrl *n, NvmeNamespace *ns,
     *result = nentries;
     return NVME_SUCCESS;
 }
+static uint16_t nvme_get_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
+{
+    NvmeCmd *cmd = &req->cmd;
+
+    return NVME_SUCCESS;
+}
 
 static uint16_t nvme_get_feature(NvmeCtrl *n, NvmeRequest *req)
 {
@@ -6372,6 +6380,9 @@ static uint16_t nvme_get_feature(NvmeCtrl *n, NvmeRequest *req)
         goto out;
     case NVME_ASYNCHRONOUS_EVENT_CONF:
         result = n->features.async_config;
+        goto out;
+    case NVME_HOST_MEMORY_BUFFER:
+        result = nvme_get_feature_hmb(n, req);
         goto out;
     case NVME_TIMESTAMP:
         return nvme_get_feature_timestamp(n, req);
@@ -6523,6 +6534,37 @@ static uint16_t nvme_set_feature_fdp_events(NvmeCtrl *n, NvmeNamespace *ns,
 
     return NVME_SUCCESS;
 }
+/*
+ * This Feature controls use of the Host Memory Buffer by the controller.
+ */
+#define NVME_SETFEAT_HMB_ENABLE  BIT(0) /* Enable Host Memory Buffer */
+#define NVME_SETFEAT_HMB_MEMRET  BIT(1) /* Host is returning memory previously allocated to the Controller */
+#define NVME_SETFEAT_HMB_HMNARE  BIT(2) /* Host Memory Non-operational Access Restriction Enable */
+#define NVME_SETFEAT_HMB_CLRZERO BIT(3) /* Clear to Zero */
+static uint16_t nvme_set_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
+{
+    NvmeCmd *cmd = &req->cmd;
+    uint32_t ctrl = le32_to_cpu(cmd->cdw11);
+    uint32_t hsize = le32_to_cpu(cmd->cdw12);  /* memory buffer allocated in memory page size (CC.MPS) units.*/
+    uint32_t hmdlla = le32_to_cpu(cmd->cdw13); /* Host Memory Descriptor List Lower Address */
+    uint32_t hmdlua = le32_to_cpu(cmd->cdw14); /* Host Memory Descriptor List Upper Address */
+    uint32_t hmdlec = le32_to_cpu(cmd->cdw15); /* Host Memory Descriptor List Entry Count */
+
+    if (!(ctrl & NVME_SETFEAT_HMB_ENABLE)) {
+        n->hmb.hmb_ctrl = ctrl;
+        return NVME_SUCCESS;
+    }
+
+    if (hsize == 0) {
+        return NVME_INVALID_FIELD | NVME_DNR;
+    }
+    n->hmb.hmb_size = hsize;
+    n->hmb.hmb_addr = hmdlla  | ((uint64_t)hmdlua << 32);
+    n->hmb.hmb_count = hmdlec;
+    n->hmb.hmb_ctrl = ctrl;
+
+    return NVME_SUCCESS;
+}
 
 static uint16_t nvme_set_feature(NvmeCtrl *n, NvmeRequest *req)
 {
@@ -6655,6 +6697,9 @@ static uint16_t nvme_set_feature(NvmeCtrl *n, NvmeRequest *req)
         break;
     case NVME_ASYNCHRONOUS_EVENT_CONF:
         n->features.async_config = dw11;
+        break;
+    case NVME_HOST_MEMORY_BUFFER:
+        return nvme_set_feature_hmb(n, req);
         break;
     case NVME_TIMESTAMP:
         return nvme_set_feature_timestamp(n, req);
@@ -8508,6 +8553,7 @@ static void nvme_init_state(NvmeCtrl *n)
             atomic->atomic_writes = 1;
         }
     }
+  
 }
 
 static void nvme_init_cmb(NvmeCtrl *n, PCIDevice *pci_dev)
