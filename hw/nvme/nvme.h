@@ -54,6 +54,24 @@ typedef struct NvmeBus {
     OBJECT_CHECK(NvmeSubsystem, (obj), TYPE_NVME_SUBSYS)
 #define SUBSYS_SLOT_RSVD (void *)0xFFFF
 
+/**
+ * struct NvmeHmbDescriptor - Host Memory Buffer Descriptor Entry
+ *
+ * This structure defines the format of an entry in the Host Memory Descriptor
+ * List (HMDL), Each entry describes a contiguous block of host memory that is part of
+ * the Host Memory Buffer (HMB).
+ * 
+ * @badd: Buffer Address aligned to the memory page size (CC.MPS).
+ * @bsize: Buffer Size: number of contiguous memory page size (CC.MPS)
+ * @reserved: Reserved
+ * 
+ */
+typedef struct {
+    uint64_t badd;
+    uint32_t bsize;
+    uint32_t reserved;
+} NvmeHmbDescriptor;
+
 typedef struct NvmeReclaimUnit {
     uint64_t ruamw;
 } NvmeReclaimUnit;

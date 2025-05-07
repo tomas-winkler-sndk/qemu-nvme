@@ -6271,7 +6271,7 @@ static uint16_t nvme_get_feature_fdp_events(NvmeCtrl *n, NvmeNamespace *ns,
 }
 static uint16_t nvme_get_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
 {
-    NvmeCmd *cmd = &req->cmd;
+    // NvmeCmd *cmd = &req->cmd;
 
     return NVME_SUCCESS;
 }
@@ -6555,13 +6555,26 @@ static uint16_t nvme_set_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
         return NVME_SUCCESS;
     }
 
-    if (hsize == 0) {
+    if (hsize == 0 || hmdlec == 0) {
         return NVME_INVALID_FIELD | NVME_DNR;
     }
     n->hmb.hmb_size = hsize;
     n->hmb.hmb_addr = hmdlla  | ((uint64_t)hmdlua << 32);
     n->hmb.hmb_count = hmdlec;
+    uint32_t hmdl_size = hmdlec * sizeof(NvmeHmbDescriptor);
+    NvmeHmbDescriptor *hmdl = g_new0(NvmeHmbDescriptor, n->hmb.hmb_count);
+
+    pci_dma_read(PCI_DEVICE(n), n->hmb.hmb_addr, hmdl, hmdl_size);
+    for (uint32_t i = 0; i < n->hmb.hmb_count; i++) {
+        if (hmdl[i].badd == 0) {
+            continue;
+        }
+        if (hmdl[i].bsize == 0) {
+            continue;
+        }
+    }
     n->hmb.hmb_ctrl = ctrl;
+    g_free(hmdl);
 
     return NVME_SUCCESS;
 }
