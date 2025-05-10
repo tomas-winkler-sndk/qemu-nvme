@@ -184,6 +184,21 @@ extern const PropertyInfo qdev_prop_nguid;
 #define DEFINE_PROP_NGUID_NODEFAULT(_name, _state, _field) \
     DEFINE_PROP(_name, _state, _field, qdev_prop_nguid, NvmeNGUID)
 
+
+typedef struct NvmeUUIDListEntry {
+    uint8_t idassoc;
+    QemuUUID uuid;
+    QLIST_ENTRY(NvmeUUIDListEntry) next;
+} NvmeUUIDListEntry;
+
+typedef QLIST_HEAD(NvmeUUIDList, NvmeUUIDListEntry) NvmeUUIDList;
+
+extern const PropertyInfo qdev_prop_nvme_uuid_list;
+
+#define DEFINE_PROP_UUID_LIST(_name, _state, _field) \
+    DEFINE_PROP(_name, _state, _field, qdev_prop_nvme_uuid_list,  NvmeUUIDList)
+
+
 typedef struct NvmeNamespaceParams {
     bool      detached;
     bool      shared;
@@ -557,6 +572,8 @@ typedef struct NvmeParams {
     uint16_t atomic_awun;
     uint16_t atomic_awupf;
     bool     atomic_dn;
+    NvmeUUIDList uuid_list;
+
 } NvmeParams;
 
 typedef struct NvmeCtrl {
