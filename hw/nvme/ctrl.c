@@ -6558,26 +6558,29 @@ static uint16_t nvme_set_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
     if (hsize == 0 || hmdlec == 0) {
         return NVME_INVALID_FIELD | NVME_DNR;
     }
-    n->hmb.hmb_size = hsize;
+    n->hmb.hmb_size = hsize * 4096;
     n->hmb.hmb_addr = hmdlla  | ((uint64_t)hmdlua << 32);
     n->hmb.hmb_count = hmdlec;
+
     uint32_t hmdl_size = hmdlec * sizeof(NvmeHmbDescriptor);
     NvmeHmbDescriptor *hmdl = g_new0(NvmeHmbDescriptor, n->hmb.hmb_count);
     qemu_log("hmdlec %d\n", hmdlec);
     pci_dma_read(PCI_DEVICE(n), n->hmb.hmb_addr, hmdl, hmdl_size);
+
+    pci_dma_sglist_init(&n->hmb.sg, PCI_DEVICE(n), 0);
     for (uint32_t i = 0; i < n->hmb.hmb_count; i++) {
-        if (hmdl[i].badd == 0) {
-            continue;
-        }
-        if (hmdl[i].bsize == 0) {
+        if (hmdl[i].badd == 0 || hmdl[i].bsize == 0) {
             continue;
         }
         hwaddr addr = le64_to_cpu(hmdl[i].badd);
         size_t size = le32_to_cpu(hmdl[i].bsize) * 4096;
-        qemu_log("log log = addr x%lx, %zd\n", addr, size);
+        qemu_sglist_add(&n->hmb.sg, addr, size);
 
+        qemu_log("nvme addr[%d] 0x%lx, %zd\n", i, addr, size);
     }
+
     n->hmb.hmb_ctrl = ctrl;
+
     g_free(hmdl);
 
     return NVME_SUCCESS;
@@ -9122,6 +9125,9 @@ static void nvme_exit(PCIDevice *pci_dev)
     } else {
         msix_uninit(pci_dev, &n->bar0, &n->bar0);
     }
+
+    /* probably need to be on other place */
+    qemu_sglist_destroy(&n->hmb.sg);
 
     memory_region_del_subregion(&n->bar0, &n->iomem);
 }

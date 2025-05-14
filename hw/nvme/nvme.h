@@ -666,6 +666,7 @@ typedef struct NvmeCtrl {
     struct {
         uint32_t hmb_ctrl;
         uint32_t hmb_size;
+        QEMUSGList sg;
         hwaddr   hmb_addr;
         uint32_t hmb_count;
     } hmb;
