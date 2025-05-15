@@ -1402,10 +1402,11 @@ typedef struct NvmeHostBehaviorSupport {
     uint8_t     rsvd6[506];
 } NvmeHostBehaviorSupport;
 
+/* Logical Block Address Format */
 typedef struct QEMU_PACKED NvmeLBAF {
-    uint16_t    ms;
-    uint8_t     ds;
-    uint8_t     rp;
+    uint16_t    ms; /* size of the metadata associated with each logical block bytes */
+    uint8_t     ds; /* size of the user data in each logical block in 2^ds */
+    uint8_t     rp; /* relative performance  characteristics */
 } NvmeLBAF;
 
 typedef struct QEMU_PACKED NvmeLBAFE {
