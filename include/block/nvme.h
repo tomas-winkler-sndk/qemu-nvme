@@ -1179,7 +1179,8 @@ typedef struct QEMU_PACKED NvmeIdCtrl {
     uint16_t    mntmt;
     uint16_t    mxtmt;
     uint32_t    sanicap;
-    uint8_t     rsvd332[6];
+    uint32_t    hmminds;      /* Host Memory Buffer Minimum Descriptor Entry Size in 4K units */
+    uint16_t    hmmaxd;       /* Host Memory Maximum Descriptors Entries */
     uint16_t    nsetidmax;
     uint16_t    endgidmax;
     uint8_t     rsvd342[170];
