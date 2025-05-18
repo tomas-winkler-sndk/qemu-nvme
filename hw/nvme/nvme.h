@@ -291,16 +291,51 @@ static inline uint32_t nvme_nsid(NvmeNamespace *ns)
     return 0;
 }
 
+
+/**
+ * nvme_l2b: Convert Logical Block Address to byte offset for data.
+ * @ns: The NvmeNamespace structure.
+ * @lba: The Logical Block Address.
+ *
+ * Calculates the byte offset from the start of the namespace data area
+ * for a given LBA, using the data size exponent (ds) from the active
+ * LBA format. Calculated as lba * (2^ns->lbaf.ds).
+ *
+ * Returns: The byte offset for the LBA in the data area.
+ */
 static inline size_t nvme_l2b(NvmeNamespace *ns, uint64_t lba)
 {
     return lba << ns->lbaf.ds;
 }
 
+/**
+ * nvme_m2b: Calculate total metadata size in bytes for a block count.
+ * @ns: The NvmeNamespace structure.
+ * @lba: The number of logical blocks.
+ *
+ * Calculates the cumulative size of metadata in bytes for a given number
+ * of logical blocks (@lba). Uses the metadata size (ms) from the active
+ * LBA format. Calculated as lba * ns->lbaf.ms.
+ *
+ * Returns: Total metadata size in bytes for the block count.
+ */
 static inline size_t nvme_m2b(NvmeNamespace *ns, uint64_t lba)
 {
     return ns->lbaf.ms * lba;
 }
 
+/**
+ * nvme_moff: Calculate absolute byte offset for metadata of an LBA.
+ * @ns: The NvmeNamespace structure.
+ * @lba: The Logical Block Address.
+ *
+ * Calculates the absolute byte offset for the metadata of a specific LBA.
+ * Uses the namespace's base metadata offset (ns->moff) and the total
+ * metadata size of preceding blocks (from nvme_m2b). Relevant for out-of-band
+ * metadata.
+ *
+ * Returns: The absolute byte offset of the metadata for the LBA.
+ */
 static inline int64_t nvme_moff(NvmeNamespace *ns, uint64_t lba)
 {
     return ns->moff + nvme_m2b(ns, lba);
