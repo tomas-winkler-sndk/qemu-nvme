@@ -664,11 +664,11 @@ typedef struct NvmeCtrl {
     } pmr;
 
     struct {
-        uint32_t hmb_ctrl;
-        uint32_t hmb_size;
-        QEMUSGList sg;
-        hwaddr   hmb_addr;
-        uint32_t hmb_count;
+        uint32_t hmb_ctrl;  /* enabled or disabled */
+        uint32_t hmb_size;  /* size of allocated hmb */
+        hwaddr   hmb_addr;  /* descriptors host address */
+        uint32_t hmb_count; /* number of descriptors */
+        QEMUSGList sg;      /* descriptors */
     } hmb;
 
     uint8_t     aer_mask;
