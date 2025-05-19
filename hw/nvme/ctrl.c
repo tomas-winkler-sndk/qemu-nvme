@@ -6816,6 +6816,23 @@ static void nvme_update_dsm_limits(NvmeCtrl *n, NvmeNamespace *ns)
     }
 }
 
+static void nvme_update_tnvmcap(NvmeCtrl *n)
+{
+
+    uint64_t tnvmcap = 0;
+    for (uint32_t nsid = 1; nsid <= NVME_MAX_NAMESPACES; nsid++) {
+        NvmeNamespace *ns = nvme_ns(n, nsid);
+        if (!ns) {
+            continue;
+        }
+	tnvmcap += ns->size;
+    }
+    qemu_log("tnvmcap = %lu\n", tnvmcap);
+    for (unsigned int i = 0; i < 8; i++) {
+        n->id_ctrl.tnvmcap[i]  = (uint8_t)((tnvmcap >> (8 * i)) & 0xff);
+    }
+}
+
 static bool nvme_csi_supported(NvmeCtrl *n, uint8_t csi)
 {
     uint32_t cc;
@@ -7834,6 +7851,7 @@ static int nvme_start_ctrl(NvmeCtrl *n)
     }
 
     nvme_update_dsm_limits(n, NULL);
+    nvme_update_tnvmcap(n);
 
     return 0;
 }
