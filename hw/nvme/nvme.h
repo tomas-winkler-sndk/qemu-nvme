@@ -189,6 +189,23 @@ static const uint8_t nvme_fdp_evf_shifts[FDP_EVT_MAX] = {
     [FDP_EVT_RUH_IMPLICIT_RU_CHANGE]    = 33,
 };
 
+#define NVME_SHIFT_4K            (12)
+#define NVME_HMB_UNIT_SZ         (1 << (NVME_SHIFT_4K))
+#define NVME_FLASH_ADDRES_SET_SZ (8 * NVME_HMB_UNIT_SZ) // 32K
+#define NVME_HMB_ADDRES_SZ       sizeof(uint32_t)
+
+#define lo32(a) ((uint32_t)(a))
+#define up32(a) ((uint32_t)(((a) >> 16) >> 16))
+#define to64(high, low)  ((uint64_t)(high) << 32) | (low);
+
+typedef struct NvmeFlashAddressMapParams {
+    uint32_t num_of_entries;  /* num of fa descriptors */
+    uint32_t set_size;        /* in bytes */
+    uint32_t entry_size;      /* in bytes */
+    uint32_t segment_index;   /* memory sgement index */
+} NvmeFlashAddressMapParams;
+
+
 #define NGUID_LEN 16
 
 typedef struct {
@@ -285,6 +302,7 @@ typedef struct NvmeNamespace {
     NvmeNamespaceParams params;
     NvmeSubsystem *subsys;
     NvmeEnduranceGroup *endgrp;
+    NvmeFlashAddressMapParams fam_params;
 
     /* NULL for shared namespaces; set to specific controller if private */
     NvmeCtrl *ctrl;
@@ -298,6 +316,7 @@ typedef struct NvmeNamespace {
         /* reclaim unit handle identifiers indexed by placement handle */
         uint16_t *phs;
     } fdp;
+
 } NvmeNamespace;
 
 static inline uint32_t nvme_nsid(NvmeNamespace *ns)
@@ -447,6 +466,11 @@ int nvme_ns_setup(NvmeNamespace *ns, Error **errp);
 void nvme_ns_drain(NvmeNamespace *ns);
 void nvme_ns_shutdown(NvmeNamespace *ns);
 void nvme_ns_cleanup(NvmeNamespace *ns);
+/* HMB Support */
+size_t nvme_ns_fam_calc_required_mem(NvmeNamespace *ns, uint32_t fam_set_size,
+				     uint32_t addr_size, Error **errp);
+void nvme_ns_fam_setup_params(NvmeNamespace *ns, uint32_t fam_set_size, uint32_t addr_size);
+void nvme_ns_fam_setup_all(NvmeCtrl *ns);
 
 typedef struct NvmeAsyncEvent {
     QTAILQ_ENTRY(NvmeAsyncEvent) entry;

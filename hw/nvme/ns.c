@@ -672,12 +672,12 @@ int nvme_ns_setup(NvmeNamespace *ns, Error **errp)
             return -1;
         }
         nvme_ns_init_zoned(ns);
-    }
-
-    if (ns->endgrp && ns->endgrp->fdp.enabled) {
+    } else if (ns->endgrp && ns->endgrp->fdp.enabled) {
         if (!nvme_ns_init_fdp(ns, errp)) {
             return -1;
         }
+    } else {
+	//l2p_setup(ns);
     }
 
     return 0;

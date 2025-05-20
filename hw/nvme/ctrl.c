@@ -3714,7 +3714,7 @@ static void nvme_do_write_fdp(NvmeCtrl *n, NvmeRequest *req, uint64_t slba,
 }
 
 static uint16_t nvme_do_write(NvmeCtrl *n, NvmeRequest *req, bool append,
-                              bool wrz)
+                              bool write_zeros)
 {
     NvmeRwCmd *rw = (NvmeRwCmd *)&req->cmd;
     NvmeNamespace *ns = req->ns;
@@ -3745,7 +3745,7 @@ static uint16_t nvme_do_write(NvmeCtrl *n, NvmeRequest *req, bool append,
     trace_pci_nvme_write(nvme_cid(req), nvme_io_opc_str(rw->opcode),
                          nvme_nsid(ns), nlb, mapped_size, slba);
 
-    if (!wrz) {
+    if (!write_zeros) {
         status = nvme_check_mdts(n, mapped_size);
         if (status) {
             goto invalid;
@@ -3832,7 +3832,7 @@ static uint16_t nvme_do_write(NvmeCtrl *n, NvmeRequest *req, bool append,
         return nvme_dif_rw(n, req);
     }
 
-    if (!wrz) {
+    if (!write_zeros) {
         status = nvme_map_data(n, nlb, req);
         if (status) {
             goto invalid;
@@ -6534,6 +6534,7 @@ static uint16_t nvme_set_feature_fdp_events(NvmeCtrl *n, NvmeNamespace *ns,
 
     return NVME_SUCCESS;
 }
+
 /*
  * This Feature controls use of the Host Memory Buffer by the controller.
  */
@@ -6558,8 +6559,8 @@ static uint16_t nvme_set_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
     if (hsize == 0 || hmdlec == 0) {
         return NVME_INVALID_FIELD | NVME_DNR;
     }
-    n->hmb.hmb_size = hsize * 4096;
-    n->hmb.hmb_addr = hmdlla  | ((uint64_t)hmdlua << 32);
+    n->hmb.hmb_size = hsize * NVME_HMB_UNIT_SZ;
+    n->hmb.hmb_addr = to64(hmdlua, hmdlla);
     n->hmb.hmb_count = hmdlec;
 
     uint32_t hmdl_size = hmdlec * sizeof(NvmeHmbDescriptor);
@@ -6582,6 +6583,8 @@ static uint16_t nvme_set_feature_hmb(NvmeCtrl *n, NvmeRequest *req)
     n->hmb.hmb_ctrl = ctrl;
 
     g_free(hmdl);
+
+    nvme_ns_fam_setup_all(n);
 
     return NVME_SUCCESS;
 }
@@ -6818,18 +6821,32 @@ static void nvme_update_dsm_limits(NvmeCtrl *n, NvmeNamespace *ns)
 
 static void nvme_update_tnvmcap(NvmeCtrl *n)
 {
-
+    Error *err = NULL;
     uint64_t tnvmcap = 0;
+    size_t prefered_size = 0;
+    uint32_t cnt = 0;
     for (uint32_t nsid = 1; nsid <= NVME_MAX_NAMESPACES; nsid++) {
         NvmeNamespace *ns = nvme_ns(n, nsid);
         if (!ns) {
             continue;
         }
-	tnvmcap += ns->size;
+        tnvmcap += ns->size;
+        prefered_size += nvme_ns_fam_calc_required_mem(ns, NVME_FLASH_ADDRES_SET_SZ, NVME_HMB_ADDRES_SZ, &err);
+        if (err) {
+            error_report_err(err);
+            return;
+        }
     }
-    qemu_log("tnvmcap = %lu\n", tnvmcap);
+    qemu_log("cnt = %d, tnvmcap = %lu, required_size = %lu\n", cnt, tnvmcap, prefered_size);
     for (unsigned int i = 0; i < 8; i++) {
         n->id_ctrl.tnvmcap[i]  = (uint8_t)((tnvmcap >> (8 * i)) & 0xff);
+    }
+
+    if (prefered_size > 0) {
+        n->id_ctrl.hmpre = cpu_to_le16((uint16_t)(prefered_size / NVME_HMB_UNIT_SZ));
+        n->id_ctrl.hmmin = cpu_to_le16((uint16_t)((prefered_size >> 1) / NVME_HMB_UNIT_SZ));
+        n->id_ctrl.hmminds = NVME_FLASH_ADDRES_SET_SZ / NVME_HMB_UNIT_SZ;
+        n->id_ctrl.hmmaxd = 0;
     }
 }
 
@@ -8591,7 +8608,6 @@ static void nvme_init_state(NvmeCtrl *n)
             atomic->atomic_writes = 1;
         }
     }
-  
 }
 
 static void nvme_init_cmb(NvmeCtrl *n, PCIDevice *pci_dev)
